@@ -1,0 +1,32 @@
+@url = http://localhost:5000
+@key = x-api-key: dev#1234
+@json = Content-Type: application/json
+
+###
+
+GET {{url}}
+
+###
+
+GET {{url}}/msg/0dabf76aaeb24543b441df9600a00464
+{{key}}
+
+###
+
+GET {{url}}/msg?id=0dabf76aaeb24543b441df9600a00464
+{{key}}
+
+###
+
+POST {{url}}/msg
+{{key}}
+{{json}}
+
+{
+    "messageId": "1234",
+    "from": "Tester <tester@somesite.local>",
+    "to": "Tester <tester@othersite.local>",
+    "subject": "test message",
+    "text": "If you are reading this, appmail still works.",
+    "bccSender": true
+}
