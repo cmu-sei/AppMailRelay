@@ -94,6 +94,7 @@ namespace AppMailRelay
 
         public void ProcessQueue()
         {
+            // using (var client = new SmtpClient(new ProtocolLogger ("smtp.log")))
             using (var client = new SmtpClient())
             {
                 foreach(var source in _queue.GetConsumingEnumerable())

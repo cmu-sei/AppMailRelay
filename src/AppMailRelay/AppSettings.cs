@@ -1,5 +1,5 @@
-// Copyright 2020 Carnegie Mellon University. 
-// Released under a MIT (SEI) license. See LICENSE.md in the project root. 
+// Copyright 2020 Carnegie Mellon University.
+// Released under a MIT (SEI) license. See LICENSE.md in the project root.
 
 namespace AppMailRelay
 {
@@ -32,6 +32,6 @@ namespace AppMailRelay
     public class RedisOptions
     {
         public string Url { get; set; }
-        public string Name { get; set; } = "AppMailRelay";
+        public string Name { get; set; } = "appmail_";
     }
 }
