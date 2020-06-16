@@ -10,6 +10,7 @@ CMD [ "dotnet", "run" ]
 
 FROM mcr.microsoft.com/dotnet/core/aspnet:3.1 as prod
 COPY --from=dev /app/dist /app
+COPY --from=dev /app/License.md /app
 WORKDIR /app
 EXPOSE 80/tcp
 ENV ASPNETCORE_URLS=http://*:80
