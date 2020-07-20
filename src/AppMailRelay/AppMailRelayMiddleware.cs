@@ -8,6 +8,7 @@ using System.Threading.Tasks;
 using AppMailRelay.Models;
 using AppMailRelay.Extensions;
 using Microsoft.AspNetCore.Http;
+using Microsoft.Extensions.Logging;
 
 namespace AppMailRelay
 {
@@ -16,11 +17,13 @@ namespace AppMailRelay
         public AppMailRelayMiddleware(
             RequestDelegate next,
             IMailer mailer,
+            ILogger<AppMailRelayMiddleware> logger,
             RelayOptions options
         )
         {
             _next = next;
             _mailer = mailer;
+            _logger = logger;
             _options = options;
 
             _jsonOptions = new JsonSerializerOptions
@@ -34,6 +37,7 @@ namespace AppMailRelay
         private readonly RequestDelegate _next;
         private readonly RelayOptions _options;
         private readonly IMailer _mailer;
+        private readonly ILogger _logger;
         private readonly JsonSerializerOptions _jsonOptions;
         public async Task Invoke(HttpContext context)
         {
@@ -66,6 +70,7 @@ namespace AppMailRelay
                 }
                 catch (Exception ex)
                 {
+                    _logger.LogError(ex, "Failed to enqueue message.");
                     await OnError(context, ex.Message);
                 }
             }

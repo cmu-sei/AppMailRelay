@@ -31,7 +31,7 @@ namespace AppMailRelay
         {
             _logger = logger;
             _options = options;
-            _queue = new BlockingCollection<TaggedMessage>();
+            _queue = new ConcurrentQueue<TaggedMessage>();
             _cache = cache;
             _cacheOptions = new DistributedCacheEntryOptions
             {
@@ -44,7 +44,7 @@ namespace AppMailRelay
         private readonly DistributedCacheEntryOptions _cacheOptions;
         private readonly ILogger<Mailer> _logger;
         private readonly MailOptions _options;
-        private readonly BlockingCollection<TaggedMessage> _queue;
+        private readonly ConcurrentQueue<TaggedMessage> _queue;
         private string logMsg = "Mail sent to {0} on behalf of {1} {2}. {3}";
 
         public async Task<MailMessageStatus> GetStatus(string referenceId)
@@ -75,12 +75,7 @@ namespace AppMailRelay
                 Status = MessageStatus.pending.ToString()
             };
 
-            string errorMessage = "";
-            if (!_queue.TryAdd(message))
-            {
-                status.Status = MessageStatus.failure.ToString();
-                errorMessage = "Unable to add message to queue.";
-            }
+            _queue.Enqueue(message);
 
             await _cache.SetStringAsync(
                 status.ReferenceId,
@@ -88,44 +83,49 @@ namespace AppMailRelay
                 _cacheOptions
             );
 
-            _logger.LogDebug(logMsg, message.To, message.ClientName, status.Status, errorMessage);
+            _logger.LogDebug(logMsg, message.To, message.ClientName, status.Status);
             return status;
         }
 
         public void ProcessQueue()
         {
-            // using (var client = new SmtpClient(new ProtocolLogger ("smtp.log")))
-            using (var client = new SmtpClient())
+            while(true)
             {
-                foreach(var source in _queue.GetConsumingEnumerable())
-                {
-                    var status = new MailMessageStatus
-                    {
-                        ReferenceId = source.ReferenceId,
-                        MessageId = source.MessageId
-                    };
+                Task.Delay(5000).Wait();
 
-                    if (!client.IsConnected)
+                if (_queue.IsEmpty)
+                    continue;
+
+                // using (var client = new SmtpClient(new ProtocolLogger ("smtp.log")))
+                using (var client = new SmtpClient())
+                {
+                    try
                     {
-                        try
+                        _logger.LogDebug("Items in queue; connecting smtp client to [{0}].", _options.Host);
+                        client.Connect(_options.Host, _options.Port); //, SecureSocketOptions.Auto);
+                        client.AuthenticationMechanisms.Remove ("XOAUTH2");
+                        if (_options.User.HasValue() && _options.Password.HasValue())
                         {
-                            _logger.LogDebug("Items in queue; connecting smtp client to [{0}].", _options.Host);
-                            client.Connect(_options.Host, _options.Port); //, SecureSocketOptions.Auto);
-                            client.AuthenticationMechanisms.Remove ("XOAUTH2");
-                            if (_options.User.HasValue() && _options.Password.HasValue())
-                            {
-                                client.Authenticate(_options.User, _options.Password);
-                            }
-                        }
-                        catch (Exception ex)
-                        {
-                            status.Status = MessageStatus.failure.ToString();
-                            _logger.LogError("Failed to connect to smtp server [{0}]. {1}", _options.Host, ex.Message);
+                            client.Authenticate(_options.User, _options.Password);
                         }
                     }
-
-                    if (client.IsConnected)
+                    catch (Exception ex)
                     {
+                        // status.Status = MessageStatus.failure.ToString();
+                        _logger.LogError("Failed to connect to smtp server [{0}]. {1}", _options.Host, ex.Message);
+                        continue;
+                    }
+
+                    // foreach(var source in _queue.GetConsumingEnumerable())
+                    while (_queue.TryDequeue(out TaggedMessage source))
+                    {
+
+                        var status = new MailMessageStatus
+                        {
+                            ReferenceId = source.ReferenceId,
+                            MessageId = source.MessageId
+                        };
+
                         if (!source.From.HasValue())
                             source.From = _options.Sender;
 
@@ -150,21 +150,20 @@ namespace AppMailRelay
                             _logger.LogError(logMsg, source.To, source.ClientName, "failed", ex.Message);
                         }
 
+                        status.Timestamp = DateTime.UtcNow;
+
+                        _cache.SetString(
+                            status.ReferenceId,
+                            JsonSerializer.Serialize(status),
+                            _cacheOptions
+                        );
+
+                        Task.Delay(100).Wait();
                     }
 
-                    status.Timestamp = DateTime.UtcNow;
+                    client.Disconnect(true);
+                    _logger.LogDebug("Queue empty; disconnected smtp client.");
 
-                    _cache.SetString(
-                        status.ReferenceId,
-                        JsonSerializer.Serialize(status),
-                        _cacheOptions
-                    );
-
-                    if (_queue.Count == 0 && client.IsConnected)
-                    {
-                        client.Disconnect(true);
-                        _logger.LogDebug("Queue empty; disconnected smtp client.");
-                    }
                 }
             }
         }
