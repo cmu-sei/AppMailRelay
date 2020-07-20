@@ -45,7 +45,7 @@ namespace AppMailRelay
         private readonly ILogger<Mailer> _logger;
         private readonly MailOptions _options;
         private readonly ConcurrentQueue<TaggedMessage> _queue;
-        private string logMsg = "Mail sent to {0} on behalf of {1} {2}. {3}";
+        private string logMsg = "Mail sent to {0} on behalf of {1} {2}.";
 
         public async Task<MailMessageStatus> GetStatus(string referenceId)
         {
