@@ -158,7 +158,7 @@ namespace AppMailRelay
                             _cacheOptions
                         );
 
-                        Task.Delay(100).Wait();
+                        Task.Delay(200).Wait();
                     }
 
                     client.Disconnect(true);
